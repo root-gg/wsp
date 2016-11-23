@@ -1,0 +1,12 @@
+*.log
+
+ssl/
+*.key
+*.crt
+
+wsp_server/wsp_server
+wsp_client/wsp_client
+test_api/test_api
+
+# IntelliJ IDEA
+.idea

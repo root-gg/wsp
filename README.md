@@ -28,16 +28,23 @@ WSP server configuration
 ------------------------
 
 ```
-# wsp_server.conf.yml
+# wsp_server.cfg
 ---
-host: 127.0.0.1
-port: 8080
-timeout : 1
+host : 127.0.0.1                     # Address to bind the HTTP server
+port : 8080                          # Port to bind the HTTP server
+timeout : 1000                       # Time to wait before acquiring a WS connection to forward the request (milliseconds)
+blacklist :                          # Forbidden destination ( deny nothing if empty )
+ - method : ".*"                     #   Applied in order before whitelist
+   url : "^http(s)?://google.*"      #   None must match
+whitelist :                          # Allowed destinations  ( allow all if empty )
+ - method : "^GET$"                  #   Applied in order after blacklist
+   url : "^http(s)?://.*"            #   One must match
+
 ```
 
 ```
-$ go build wsp_server.go
-$ ./wsp_server -config wsp_server.conf.yml
+$ cd wsp_client && go build
+$ ./wsp_server -config wsp_server.cfg
 {
   "Host": "127.0.0.1",
   "Port": 8080
@@ -63,13 +70,19 @@ WSP proxy configuration
 -----------------------
 
 ```
-# wsp_client.conf.yml
+# wsp_client.cfg
 ---
-targets :
- - ws://127.0.0.1:8080/register
-poolMinSize : 10
-poolMinIdleSize : 5
-poolMaxSize : 100
+targets :                            # Endpoints to connect to
+ - ws://127.0.0.1:8080/register      #
+poolminsize : 10                     # Default number of concurrent open (TCP) connections per WSP server
+poolminidlesize : 5                  # Default number of concurrent open (TCP) connections to keep idle per WSP server
+poolmaxsize : 100                    # Maximum number of concurrent open (TCP) connections per WSP server
+blacklist :                          # Forbidden destination ( deny nothing if empty )
+ - method : ".*"                     #   Applied in order before whitelist
+   url : ".*forbidden.*"             #   None must match
+whitelist :                          # Allowed destinations  ( allow all if empty )
+ - method : "^GET$"                  #   Applied in order after blacklist
+   url : "^https://.*"               #   One must match
 ```
 
  - poolMinSize is the default number of opened TCP/HTTP/WS connections
@@ -83,8 +96,8 @@ poolMaxSize : 100
  the proxy will ever initiate per WSP server.
 
 ```
-$ go build wsp_client.go
-$ ./wsp_client -config wsp_client.conf.yml
+$ cd wsp_client && go build
+$ ./wsp_client -config wsp_client.cfg
 {
   "ID": "7e2d8782-f893-4ff3-7e9d-299b4c0a518a",
   "Targets": [
