@@ -49,7 +49,7 @@ func (connection *Connection) Connect() (err error) {
 	log.Printf("Connected to %s", connection.pool.target)
 
 	// Send the greeting message with proxy id and wanted pool size.
-	greeting := fmt.Sprintf("%s_%d", connection.pool.client.Config.ID, connection.pool.client.Config.PoolMinSize)
+	greeting := fmt.Sprintf("%s_%d", connection.pool.client.Config.ID, connection.pool.client.Config.PoolIdleSize)
 	err = connection.ws.WriteMessage(websocket.TextMessage, []byte(greeting))
 	if err != nil {
 		log.Println("greeting error :", err)
@@ -114,7 +114,6 @@ func (connection *Connection) serve() {
 		log.Printf("[%s] %s", req.Method, req.URL.String())
 
 		// Apply blacklist
-
 		if len(connection.pool.client.Config.Blacklist) > 0 {
 			for _, rule := range connection.pool.client.Config.Blacklist {
 				if rule.Match(req) {
@@ -133,7 +132,6 @@ func (connection *Connection) serve() {
 		}
 
 		// Apply whitelist
-
 		if len(connection.pool.client.Config.Whitelist) > 0 {
 			allowed := false
 			for _, rule := range connection.pool.client.Config.Whitelist {

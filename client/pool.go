@@ -54,24 +54,19 @@ func (pool *Pool) connector() {
 	//log.Printf("%s pool size : %v", pool.target, poolSize)
 
 	// Create enough connection to fill the pool
-	toCreate := pool.client.Config.PoolMinSize - poolSize.total
+	toCreate := pool.client.Config.PoolIdleSize - poolSize.idle
 
 	// Create only one connection if the pool is empty
 	if poolSize.total == 0 {
 		toCreate = 1
 	}
 
-	// Ensure to keep at least PoolMinIdleSize idle connections
-	if poolSize.idle < pool.client.Config.PoolMinIdleSize && poolSize.total > pool.client.Config.PoolMinSize {
-		if pool.client.Config.PoolMinIdleSize-poolSize.idle > toCreate {
-			toCreate = pool.client.Config.PoolMinIdleSize - poolSize.idle
-		}
-	}
-
 	// Ensure to open at most PoolMaxSize connections
 	if poolSize.total+toCreate > pool.client.Config.PoolMaxSize {
 		toCreate = pool.client.Config.PoolMaxSize - poolSize.total
 	}
+
+	//log.Printf("%v",toCreate)
 
 	// Try to reach ideal pool size
 	for i := 0; i < toCreate; i++ {

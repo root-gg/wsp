@@ -10,11 +10,12 @@ import (
 
 // Config configures an Server
 type Config struct {
-	Host      string
-	Port      int
-	Timeout   int
-	Whitelist []*common.Rule
-	Blacklist []*common.Rule
+	Host        string
+	Port        int
+	Timeout     int
+	IdleTimeout int
+	Whitelist   []*common.Rule
+	Blacklist   []*common.Rule
 }
 
 // NewConfig creates a new ProxyConfig
@@ -23,6 +24,7 @@ func NewConfig() (config *Config) {
 	config.Host = "127.0.0.1"
 	config.Port = 8080
 	config.Timeout = 1000
+	config.IdleTimeout = 60000
 	config.Whitelist = make([]*common.Rule, 0)
 	config.Blacklist = make([]*common.Rule, 0)
 	return

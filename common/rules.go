@@ -1,6 +1,7 @@
 package common
 
 import (
+	"fmt"
 	"net/http"
 	"regexp"
 )
@@ -49,4 +50,8 @@ func (rule *Rule) Match(req *http.Request) bool {
 		return false
 	}
 	return true
+}
+
+func (rule *Rule) String() string {
+	return fmt.Sprintf("%s %s", rule.Method, rule.URL)
 }

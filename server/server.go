@@ -5,13 +5,13 @@ import (
 	"math/rand"
 	"net/http"
 	"net/url"
+	"reflect"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
-
 	"github.com/root-gg/wsp/common"
 )
 
@@ -28,7 +28,25 @@ type Server struct {
 	lock  sync.RWMutex
 	done  chan struct{}
 
+	dispatcher chan *connectionRequest
+
 	server *http.Server
+}
+
+// connectionRequest is used to request a proxy connection from the dispatcher
+type connectionRequest struct {
+	connection chan *Connection
+	timeout    <-chan time.Time
+}
+
+// NewConnectionRequest creates a new connection request
+func NewConnectionRequest(timeout time.Duration) (cr *connectionRequest) {
+	cr = new(connectionRequest)
+	cr.connection = make(chan *Connection)
+	if timeout > 0 {
+		cr.timeout = time.After(timeout)
+	}
+	return
 }
 
 // NewServer return a new Server instance
@@ -39,9 +57,8 @@ func NewServer(config *Config) (server *Server) {
 	server.Config = config
 	server.upgrader = websocket.Upgrader{}
 
-	server.pools = make([]*Pool, 0)
 	server.done = make(chan struct{})
-
+	server.dispatcher = make(chan *connectionRequest)
 	return
 }
 
@@ -52,7 +69,7 @@ func (server *Server) Start() {
 			select {
 			case <-server.done:
 				break
-			case <-time.After(30 * time.Second):
+			case <-time.After(5 * time.Second):
 				server.clean()
 			}
 		}
@@ -63,30 +80,93 @@ func (server *Server) Start() {
 	r.HandleFunc("/register", server.register)
 	r.HandleFunc("/status", server.status)
 
+	go server.dispatchConnections()
+
 	server.server = &http.Server{Addr: server.Config.Host + ":" + strconv.Itoa(server.Config.Port), Handler: r}
 	go func() { log.Fatal(server.server.ListenAndServe()) }()
 }
 
 // clean remove empty Pools
-func (server *Server) clean() int {
+func (server *Server) clean() {
 	server.lock.Lock()
 	defer server.lock.Unlock()
 
 	if len(server.pools) == 0 {
-		return 0
+		return
 	}
 
-	var pools []*Pool // == nil
+	var pools []*Pool
 	for _, pool := range server.pools {
-		if pool.clean() > 0 {
-			pools = append(pools, pool)
-		} else {
+		if pool.IsEmpty() {
 			log.Printf("Removing empty connection pool : %s", pool.id)
+		} else {
+			pools = append(pools, pool)
 		}
 	}
 	server.pools = pools
+}
 
-	return len(server.pools)
+// Dispatch connection from available pools to clients requests
+func (server *Server) dispatchConnections() {
+	for {
+		// A client requests a connection
+		request, ok := <-server.dispatcher
+		if !ok {
+			// Shutdown
+			break
+		}
+
+		for {
+			server.lock.RLock()
+
+			if len(server.pools) == 0 {
+				// No connection pool available
+				server.lock.RUnlock()
+				break
+			}
+
+			// Build a select statement dynamically
+			cases := make([]reflect.SelectCase, len(server.pools)+1)
+
+			// Add all pools idle connection channel
+			for i, ch := range server.pools {
+				cases[i] = reflect.SelectCase{
+					Dir:  reflect.SelectRecv,
+					Chan: reflect.ValueOf(ch.idle)}
+			}
+
+			// Add timeout channel
+			if request.timeout != nil {
+				cases[len(cases)-1] = reflect.SelectCase{
+					Dir:  reflect.SelectRecv,
+					Chan: reflect.ValueOf(request.timeout)}
+			} else {
+				cases[len(cases)-1] = reflect.SelectCase{
+					Dir: reflect.SelectDefault}
+			}
+
+			server.lock.RUnlock()
+
+			// This call blocks
+			chosen, value, ok := reflect.Select(cases)
+
+			if chosen == len(cases)-1 {
+				// a timeout occured
+				break
+			}
+			if !ok {
+				// a proxy pool has been removed, try again
+				continue
+			}
+			connection, _ := value.Interface().(*Connection)
+			if connection.status == IDLE {
+				request.connection <- connection
+				break
+			}
+		}
+
+		close(request.connection)
+	}
 }
 
 // This is the way for clients to execute HTTP requests through an Proxy
@@ -107,7 +187,6 @@ func (server *Server) request(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[%s] %s", r.Method, r.URL.String())
 
 	// Apply blacklist
-
 	if len(server.Config.Blacklist) > 0 {
 		for _, rule := range server.Config.Blacklist {
 			if rule.Match(r) {
@@ -118,7 +197,6 @@ func (server *Server) request(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Apply whitelist
-
 	if len(server.Config.Whitelist) > 0 {
 		allowed := false
 		for _, rule := range server.Config.Whitelist {
@@ -138,48 +216,26 @@ func (server *Server) request(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	start := time.Now()
-
-	// Randomly select a pool ( other load-balancing strategies could be implemented )
-	// and try to acquire a connection. This should be refactored to use channels
-	index := rand.Intn(len(server.pools))
-	for {
-		if time.Now().Sub(start).Seconds()*float64(1000) > float64(server.Config.Timeout) {
-			break
-		}
-
-		// Get a pool
-		server.lock.RLock()
-		index = (index + 1) % len(server.pools)
-		pool := server.pools[index]
-		server.lock.RUnlock()
-
-		// Get a connection
-		if connection := pool.Take(); connection != nil {
-			if connection.status != IDLE && time.Now().Sub(start).Seconds() < 1 {
-				continue
-			}
-
-			// Send the request to the proxy
-			err := connection.proxyRequest(w, r)
-			if err == nil {
-				// Everything went well we can reuse the connection
-				pool.Offer(connection)
-			} else {
-				// An error occurred throw the connection away
-				log.Println(err)
-				connection.Close()
-
-				// Try to return an error to the client
-				// This might fail if response headers have already been sent
-				common.ProxyError(w, err)
-			}
-			return
-		}
-		time.Sleep(10 * time.Millisecond)
+	// Get a proxy connection
+	request := NewConnectionRequest(time.Duration(server.Config.Timeout) * time.Millisecond)
+	server.dispatcher <- request
+	connection := <-request.connection
+	if connection == nil {
+		common.ProxyErrorf(w, "Unable to get a proxy connection")
+		return
 	}
 
-	common.ProxyErrorf(w, "Unable to get a proxy connection")
+	// Send the request to the proxy
+	err = connection.proxyRequest(w, r)
+	if err != nil {
+		// An error occurred throw the connection away
+		log.Println(err)
+		connection.Close()
+
+		// Try to return an error to the client
+		// This might fail if response headers have already been sent
+		common.ProxyError(w, err)
+	}
 }
 
 // This is the way for IzolatorProxies to offer websocket connections
@@ -220,7 +276,7 @@ func (server *Server) register(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if pool == nil {
-		pool = NewPool(id)
+		pool = NewPool(server, id)
 		server.pools = append(server.pools, pool)
 	}
 
@@ -238,6 +294,7 @@ func (server *Server) status(w http.ResponseWriter, r *http.Request) {
 // Shutdown stop the Server
 func (server *Server) Shutdown() {
 	close(server.done)
+	close(server.dispatcher)
 	for _, pool := range server.pools {
 		pool.Shutdown()
 	}
