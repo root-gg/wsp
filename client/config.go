@@ -11,13 +11,12 @@ import (
 
 // Config configures an Proxy
 type Config struct {
-	ID              string
-	Targets         []string
-	PoolMinSize     int
-	PoolMinIdleSize int
-	PoolMaxSize     int
-	Whitelist       []*common.Rule
-	Blacklist       []*common.Rule
+	ID           string
+	Targets      []string
+	PoolIdleSize int
+	PoolMaxSize  int
+	Whitelist    []*common.Rule
+	Blacklist    []*common.Rule
 }
 
 // NewConfig creates a new ProxyConfig
@@ -31,8 +30,7 @@ func NewConfig() (config *Config) {
 	config.ID = id.String()
 
 	config.Targets = []string{"ws://127.0.0.1:8080/register"}
-	config.PoolMinSize = 10
-	config.PoolMinIdleSize = 5
+	config.PoolIdleSize = 10
 	config.PoolMaxSize = 100
 
 	config.Whitelist = make([]*common.Rule, 0)

@@ -33,12 +33,13 @@ WSP server configuration
 host : 127.0.0.1                     # Address to bind the HTTP server
 port : 8080                          # Port to bind the HTTP server
 timeout : 1000                       # Time to wait before acquiring a WS connection to forward the request (milliseconds)
-blacklist :                          # Forbidden destination ( deny nothing if empty )
- - method : ".*"                     #   Applied in order before whitelist
-   url : "^http(s)?://google.*"      #   None must match
-whitelist :                          # Allowed destinations  ( allow all if empty )
- - method : "^GET$"                  #   Applied in order after blacklist
-   url : "^http(s)?://.*"            #   One must match
+idletimeout : 60000                  # Time to wait before closing idle connection when there is enough idle connections (milliseconds)
+#blacklist :                         # Forbidden destination ( deny nothing if empty )
+# - method : ".*"                    #   Applied in order before whitelist
+#   url : "^http(s)?://google.*"     #   None must match
+#whitelist :                         # Allowed destinations  ( allow all if empty )
+# - method : "^GET$"                 #   Applied in order after blacklist
+#   url : "^http(s)?://.*"           #   One must match
 
 ```
 
@@ -74,15 +75,14 @@ WSP proxy configuration
 ---
 targets :                            # Endpoints to connect to
  - ws://127.0.0.1:8080/register      #
-poolminsize : 10                     # Default number of concurrent open (TCP) connections per WSP server
-poolminidlesize : 5                  # Default number of concurrent open (TCP) connections to keep idle per WSP server
+poolidlesize : 10                    # Default number of concurrent open (TCP) connections to keep idle per WSP server
 poolmaxsize : 100                    # Maximum number of concurrent open (TCP) connections per WSP server
-blacklist :                          # Forbidden destination ( deny nothing if empty )
- - method : ".*"                     #   Applied in order before whitelist
-   url : ".*forbidden.*"             #   None must match
-whitelist :                          # Allowed destinations  ( allow all if empty )
- - method : "^GET$"                  #   Applied in order after blacklist
-   url : "^https://.*"               #   One must match
+#blacklist :                         # Forbidden destination ( deny nothing if empty )
+# - method : ".*"                    #   Applied in order before whitelist
+#   url : ".*forbidden.*"            #   None must match
+#whitelist :                         # Allowed destinations  ( allow all if empty )
+# - method : "^GET$"                 #   Applied in order after blacklist
+#   url : "^https://.*"              #   One must match
 ```
 
  - poolMinSize is the default number of opened TCP/HTTP/WS connections
@@ -124,7 +124,7 @@ Client
 ------
 
 ```
-$ curl -H'X-PROXY-DESTINATION: https://google.fr' http://127.0.0.1:8080/request
+$ curl -H 'X-PROXY-DESTINATION: https://google.fr' http://127.0.0.1:8080/request
 <!doctype html><html itemscope="" itemtype="http://schema.org/WebPage" lang="fr"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"><meta content="/images/branding/googleg/1x/googleg_standard_color_128dp.png" it...
 ```
 
@@ -132,7 +132,4 @@ Roadmap
 -------
 
  - Server TLS
- - Client TSL certificate check ( for proxy and clients )
- - Filters
- - Better pooling algorithm
- - Other load balancing strategies
+ - Client TLS certificate check ( for proxy and clients )

@@ -1,105 +1,101 @@
 package server
 
 import (
-	"errors"
 	"log"
 	"sync"
+	"time"
 
 	"github.com/gorilla/websocket"
 )
 
-// ErrPoolFull is returned when there is enough connection in the pool
-var ErrPoolFull = errors.New("Pool is full")
-
-// Pool handle all connections from a remove Proxy
+// Pool handle all connections from a remote Proxy
 type Pool struct {
-	id string
+	server *Server
+	id     string
 
-	size        int
+	size int
+
 	connections []*Connection
-	lock        sync.RWMutex
+	idle        chan *Connection
 
-	done chan (struct{})
+	lock sync.RWMutex
 }
 
 // NewPool creates a new Pool
-func NewPool(name string) (pool *Pool) {
+func NewPool(server *Server, id string) (pool *Pool) {
 	pool = new(Pool)
-	pool.id = name
-	pool.connections = make([]*Connection, 0)
+	pool.server = server
+	pool.id = id
+	pool.idle = make(chan *Connection)
 	return
 }
 
 // Register creates a new Connection and adds it to the pool
 func (pool *Pool) Register(ws *websocket.Conn) (err error) {
+	pool.lock.Lock()
+	defer pool.lock.Unlock()
+
 	log.Printf("Registering new connection from %s", pool.id)
-	pc := NewConnection(pool, ws)
-	err = pool.Offer(pc)
+	connection := NewConnection(pool, ws)
+	pool.connections = append(pool.connections, connection)
+	go pool.Offer(connection)
 	return
 }
 
-// Offer adds a connection to the pool
-func (pool *Pool) Offer(connection *Connection) (err error) {
-	pool.lock.Lock()
-	defer pool.lock.Unlock()
-
-	size := pool.clean()
-	if size < pool.size {
-		pool.connections = append(pool.connections, connection)
-	} else {
-		err = ErrPoolFull
-		log.Printf("Discarding connection from %s because pool is full", pool.id)
-		connection.Close()
-	}
-
-	return
-}
-
-// Take borrow a connection from the pool
-func (pool *Pool) Take() (pc *Connection) {
-	pool.lock.Lock()
-	defer pool.lock.Unlock()
-
-	size := pool.clean()
-	if size == 0 {
-		return
-	}
-
-	// Shift
-	pc, pool.connections = pool.connections[0], pool.connections[1:]
-
-	return
+// Offer an idle connection to the server
+func (pool *Pool) Offer(connection *Connection) {
+	pool.idle <- connection
 }
 
 // Look for dead connection in the pool
 // This MUST be surrounded by pool.lock.Lock()
-func (pool *Pool) clean() int {
-	if len(pool.connections) == 0 {
-		return 0
-	}
-
-	var connections []*Connection // == nil
-	for _, pc := range pool.connections {
-		if pc.status == IDLE {
-			connections = append(connections, pc)
+func (pool *Pool) clean() {
+	idle := 0
+	var connections []*Connection
+	for _, connection := range pool.connections {
+		if connection.status == IDLE {
+			idle++
+			if idle > pool.size {
+				// We have enough idle connections in the pool.
+				// Terminate the connection if it is idle since more that IdleTimeout
+				if int(time.Now().Sub(connection.idleSince).Seconds())*1000 > pool.server.Config.IdleTimeout {
+					connection.Close()
+				}
+			}
 		}
+		if connection.status == CLOSED {
+			continue
+		}
+		connections = append(connections, connection)
 	}
 	pool.connections = connections
-
-	return len(pool.connections)
 }
 
-// Look for dead connection in the pool and return true if the pool is empty
-func (pool *Pool) isEmpty() bool {
+// Clean removes dead connection from the pool and terminate idle connections if needed
+func (pool *Pool) Clean() {
 	pool.lock.Lock()
 	defer pool.lock.Unlock()
-	return pool.clean() == 0
+
+	pool.clean()
+}
+
+// IsEmpty clean the pool and return true if the pool is empty
+func (pool *Pool) IsEmpty() bool {
+	pool.lock.Lock()
+	defer pool.lock.Unlock()
+
+	pool.clean()
+	return len(pool.connections) == 0
 }
 
 // Shutdown closes every connections in the pool and cleans it
 func (pool *Pool) Shutdown() {
+	pool.lock.Lock()
+	defer pool.lock.Unlock()
+
 	for _, connection := range pool.connections {
 		connection.Close()
 	}
 	pool.clean()
+
 }

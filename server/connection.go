@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/gorilla/websocket"
 
@@ -23,12 +24,11 @@ const (
 
 // Connection manage a single websocket connection from
 type Connection struct {
-	pool *Pool
-	ws   *websocket.Conn
-
-	status int
-	lock   sync.Mutex
-
+	pool         *Pool
+	ws           *websocket.Conn
+	status       int
+	idleSince    time.Time
+	lock         sync.Mutex
 	nextResponse chan chan io.Reader
 }
 
@@ -38,6 +38,9 @@ func NewConnection(pool *Pool, ws *websocket.Conn) (connection *Connection) {
 	connection.pool = pool
 	connection.ws = ws
 	connection.nextResponse = make(chan chan io.Reader)
+
+	connection.status = IDLE
+	connection.idleSince = time.Now()
 
 	go connection.read()
 
@@ -193,7 +196,12 @@ func (connection *Connection) proxyRequest(w http.ResponseWriter, r *http.Reques
 	// Notify read() that we are done reading the response body
 	close(responseBodyChannel)
 
+	connection.idleSince = time.Now()
 	connection.status = IDLE
+
+	// Offer the connection back to the pool
+	go connection.pool.Offer(connection)
+
 	return
 }
 
