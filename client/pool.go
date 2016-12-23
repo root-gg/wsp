@@ -51,7 +51,7 @@ func (pool *Pool) connector() {
 
 	poolSize := pool.Size()
 
-	//log.Printf("%s pool size : %v", pool.target, poolSize)
+	log.Printf("%s pool size : %v", pool.target, poolSize)
 
 	// Create enough connection to fill the pool
 	toCreate := pool.client.Config.PoolIdleSize - poolSize.idle

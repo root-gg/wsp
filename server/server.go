@@ -16,32 +16,31 @@ import (
 )
 
 // Server is a Reverse HTTP Proxy over WebSocket
-// This is the Server part IzolatorProxies will offer websocket connections,
+// This is the Server part, Clients will offer websocket connections,
 // those will be pooled to transfer HTTP Request and response
 type Server struct {
 	Config *Config
 
 	upgrader websocket.Upgrader
 
-	// Remote IzolatorProxies
 	pools []*Pool
 	lock  sync.RWMutex
 	done  chan struct{}
 
-	dispatcher chan *connectionRequest
+	dispatcher chan *ConnectionRequest
 
 	server *http.Server
 }
 
-// connectionRequest is used to request a proxy connection from the dispatcher
-type connectionRequest struct {
+// ConnectionRequest is used to request a proxy connection from the dispatcher
+type ConnectionRequest struct {
 	connection chan *Connection
 	timeout    <-chan time.Time
 }
 
 // NewConnectionRequest creates a new connection request
-func NewConnectionRequest(timeout time.Duration) (cr *connectionRequest) {
-	cr = new(connectionRequest)
+func NewConnectionRequest(timeout time.Duration) (cr *ConnectionRequest) {
+	cr = new(ConnectionRequest)
 	cr.connection = make(chan *Connection)
 	if timeout > 0 {
 		cr.timeout = time.After(timeout)
@@ -58,7 +57,7 @@ func NewServer(config *Config) (server *Server) {
 	server.upgrader = websocket.Upgrader{}
 
 	server.done = make(chan struct{})
-	server.dispatcher = make(chan *connectionRequest)
+	server.dispatcher = make(chan *ConnectionRequest)
 	return
 }
 
@@ -95,14 +94,25 @@ func (server *Server) clean() {
 		return
 	}
 
+	idle := 0
+	busy := 0
+
 	var pools []*Pool
 	for _, pool := range server.pools {
 		if pool.IsEmpty() {
 			log.Printf("Removing empty connection pool : %s", pool.id)
+			pool.Shutdown()
 		} else {
 			pools = append(pools, pool)
 		}
+
+		ps := pool.Size()
+		idle += ps.Idle
+		busy += ps.Busy
 	}
+
+	log.Printf("%d pools, %d idle, %d busy", len(pools), idle, busy)
+
 	server.pools = pools
 }
 
@@ -159,7 +169,9 @@ func (server *Server) dispatchConnections() {
 				continue
 			}
 			connection, _ := value.Interface().(*Connection)
-			if connection.status == IDLE {
+
+			// Verify that we can use this connection
+			if connection.Take() {
 				request.connection <- connection
 				break
 			}
@@ -238,7 +250,7 @@ func (server *Server) request(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// This is the way for IzolatorProxies to offer websocket connections
+// This is the way for wsp clients to offer websocket connections
 func (server *Server) register(w http.ResponseWriter, r *http.Request) {
 	ws, err := server.upgrader.Upgrade(w, r, nil)
 	if err != nil {
@@ -267,7 +279,7 @@ func (server *Server) register(w http.ResponseWriter, r *http.Request) {
 	server.lock.Lock()
 	defer server.lock.Unlock()
 
-	// Get that Proxy websocket pool
+	// Get that client's Pool
 	var pool *Pool
 	for _, p := range server.pools {
 		if p.id == id {

@@ -18,7 +18,7 @@ import (
 // Status of a Connection
 const (
 	IDLE = iota
-	PROXY
+	BUSY
 	CLOSED
 )
 
@@ -39,8 +39,7 @@ func NewConnection(pool *Pool, ws *websocket.Conn) (connection *Connection) {
 	connection.ws = ws
 	connection.nextResponse = make(chan chan io.Reader)
 
-	connection.status = IDLE
-	connection.idleSince = time.Now()
+	connection.Release()
 
 	go connection.read()
 
@@ -75,7 +74,7 @@ func (connection *Connection) read() {
 			break
 		}
 
-		if connection.status != PROXY {
+		if connection.status != BUSY {
 			// We received a wild unexpected message
 			break
 		}
@@ -100,11 +99,6 @@ func (connection *Connection) read() {
 
 // Proxy a HTTP request through the Proxy over the websocket connection
 func (connection *Connection) proxyRequest(w http.ResponseWriter, r *http.Request) (err error) {
-	if connection.status != IDLE {
-		return fmt.Errorf("Proxy connection is not IDLE")
-	}
-	connection.status = PROXY
-
 	log.Printf("proxy request to %s", connection.pool.id)
 
 	// Serialize HTTP request
@@ -196,20 +190,53 @@ func (connection *Connection) proxyRequest(w http.ResponseWriter, r *http.Reques
 	// Notify read() that we are done reading the response body
 	close(responseBodyChannel)
 
-	connection.idleSince = time.Now()
-	connection.status = IDLE
-
-	// Offer the connection back to the pool
-	go connection.pool.Offer(connection)
+	connection.Release()
 
 	return
 }
 
-// Close the remote Proxy connection
+// Take notifies that this connection is going to be used
+func (connection *Connection) Take() bool {
+	connection.lock.Lock()
+	defer connection.lock.Unlock()
+
+	if connection.status == CLOSED {
+		return false
+	}
+
+	if connection.status == BUSY {
+		return false
+	}
+
+	connection.status = BUSY
+	return true
+}
+
+// Release notifies that this connection is ready to use again
+func (connection *Connection) Release() {
+	connection.lock.Lock()
+	defer connection.lock.Unlock()
+
+	if connection.status == CLOSED {
+		return
+	}
+
+	connection.idleSince = time.Now()
+	connection.status = IDLE
+
+	go connection.pool.Offer(connection)
+}
+
+// Close the connection
 func (connection *Connection) Close() {
 	connection.lock.Lock()
 	defer connection.lock.Unlock()
 
+	connection.close()
+}
+
+// Close the connection ( without lock )
+func (connection *Connection) close() {
 	if connection.status == CLOSED {
 		return
 	}

@@ -252,6 +252,7 @@ func (connection *Connection) discard() (err error) {
 func (connection *Connection) Close() {
 	connection.pool.lock.Lock()
 	defer connection.pool.lock.Unlock()
+
 	connection.pool.remove(connection)
 	connection.ws.Close()
 }
