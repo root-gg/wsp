@@ -38,7 +38,6 @@ func (pool *Pool) Register(ws *websocket.Conn) (err error) {
 	log.Printf("Registering new connection from %s", pool.id)
 	connection := NewConnection(pool, ws)
 	pool.connections = append(pool.connections, connection)
-	go pool.Offer(connection)
 	return
 }
 
@@ -53,16 +52,19 @@ func (pool *Pool) clean() {
 	idle := 0
 	var connections []*Connection
 	for _, connection := range pool.connections {
+		// We need to be sur we'll never close a BUSY or soon to be BUSY connection
+		connection.lock.Lock()
 		if connection.status == IDLE {
 			idle++
 			if idle > pool.size {
 				// We have enough idle connections in the pool.
 				// Terminate the connection if it is idle since more that IdleTimeout
 				if int(time.Now().Sub(connection.idleSince).Seconds())*1000 > pool.server.Config.IdleTimeout {
-					connection.Close()
+					connection.close()
 				}
 			}
 		}
+		connection.lock.Unlock()
 		if connection.status == CLOSED {
 			continue
 		}

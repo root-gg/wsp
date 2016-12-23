@@ -159,7 +159,9 @@ func (server *Server) dispatchConnections() {
 				continue
 			}
 			connection, _ := value.Interface().(*Connection)
-			if connection.status == IDLE {
+
+			// Verify that we can use this connection
+			if connection.Take() {
 				request.connection <- connection
 				break
 			}
