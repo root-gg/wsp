@@ -252,6 +252,12 @@ func (server *Server) request(w http.ResponseWriter, r *http.Request) {
 
 // This is the way for wsp clients to offer websocket connections
 func (server *Server) register(w http.ResponseWriter, r *http.Request) {
+	secretKey := r.Header.Get("X-SECRET-KEY")
+	if secretKey != server.Config.SecretKey {
+		common.ProxyErrorf(w, "Invalid X-SECRET-KEY")
+		return
+	}
+
 	ws, err := server.upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		common.ProxyErrorf(w, "HTTP upgrade error : %v", err)

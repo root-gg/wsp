@@ -7,6 +7,7 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
+	"net/http"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -41,7 +42,8 @@ func (connection *Connection) Connect() (err error) {
 	log.Printf("Connecting to %s", connection.pool.target)
 
 	// Create a new TCP(/TLS) connection ( no use of net.http )
-	connection.ws, _, err = connection.pool.client.dialer.Dial(connection.pool.target, nil)
+	connection.ws, _, err = connection.pool.client.dialer.Dial(connection.pool.target, http.Header{"X-SECRET-KEY": {connection.pool.secretKey}})
+
 	if err != nil {
 		return err
 	}

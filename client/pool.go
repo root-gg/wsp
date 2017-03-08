@@ -9,8 +9,9 @@ import (
 
 // Pool manage a pool of connection to a remote Server
 type Pool struct {
-	client *Client
-	target string
+	client    *Client
+	target    string
+	secretKey string
 
 	connections []*Connection
 	lock        sync.RWMutex
@@ -19,11 +20,12 @@ type Pool struct {
 }
 
 // NewPool creates a new Pool
-func NewPool(client *Client, target string) (pool *Pool) {
+func NewPool(client *Client, target string, secretKey string) (pool *Pool) {
 	pool = new(Pool)
 	pool.client = client
 	pool.target = target
 	pool.connections = make([]*Connection, 0)
+	pool.secretKey = secretKey
 	pool.done = make(chan struct{})
 	return
 }
