@@ -40,7 +40,7 @@ idletimeout : 60000                  # Time to wait before closing idle connecti
 #whitelist :                         # Allowed destinations  ( allow all if empty )
 # - method : "^GET$"                 #   Applied in order after blacklist
 #   url : "^http(s)?://.*"           #   One must match
-
+# secretkey : ThisIsASecret          # secret key that must be set in clients configuration
 ```
 
 ```
@@ -83,6 +83,7 @@ poolmaxsize : 100                    # Maximum number of concurrent open (TCP) c
 #whitelist :                         # Allowed destinations  ( allow all if empty )
 # - method : "^GET$"                 #   Applied in order after blacklist
 #   url : "^https://.*"              #   One must match
+# secretkey : ThisIsASecret          # secret key that must match the value set in servers configuration
 ```
 
  - poolMinSize is the default number of opened TCP/HTTP/WS connections

@@ -16,6 +16,7 @@ type Config struct {
 	IdleTimeout int
 	Whitelist   []*common.Rule
 	Blacklist   []*common.Rule
+	SecretKey   string
 }
 
 // NewConfig creates a new ProxyConfig

@@ -29,7 +29,7 @@ func NewClient(config *Config) (c *Client) {
 // Start the Proxy
 func (c *Client) Start() {
 	for _, target := range c.Config.Targets {
-		pool := NewPool(c, target)
+		pool := NewPool(c, target, c.Config.SecretKey)
 		c.pools[target] = pool
 		go pool.Start()
 	}
