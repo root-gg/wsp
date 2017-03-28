@@ -128,9 +128,3 @@ Client
 $ curl -H 'X-PROXY-DESTINATION: https://google.fr' http://127.0.0.1:8080/request
 <!doctype html><html itemscope="" itemtype="http://schema.org/WebPage" lang="fr"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"><meta content="/images/branding/googleg/1x/googleg_standard_color_128dp.png" it...
 ```
-
-Roadmap
--------
-
- - Server TLS
- - Client TLS certificate check ( for proxy and clients )
