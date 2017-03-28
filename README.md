@@ -24,6 +24,8 @@ buffering of any sort occurs.
 If several WSP clients connect to a WSP server, requests will be spread
 in a random way to all the WSP clients.
 
+![wsp schema](https://cloud.githubusercontent.com/assets/6413246/24397653/3f2e4b30-13a7-11e7-820b-cde6e784382f.png)
+
 WSP server configuration
 ------------------------
 
