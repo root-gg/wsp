@@ -39,9 +39,13 @@ idletimeout : 60000                  # Time to wait before closing idle connecti
 #blacklist :                         # Forbidden destination ( deny nothing if empty )
 # - method : ".*"                    #   Applied in order before whitelist
 #   url : "^http(s)?://google.*"     #   None must match
+#   headers :                        #   Optinal header check
+#     X-CUSTOM-HEADER : "^value$"    # 
 #whitelist :                         # Allowed destinations  ( allow all if empty )
 # - method : "^GET$"                 #   Applied in order after blacklist
-#   url : "^http(s)?://.*"           #   One must match
+#   url : "^http(s)?://.*$"          #   One must match
+#   headers :                        #   Optinal header check
+#     X-CUSTOM-HEADER : "^value$"    # 
 # secretkey : ThisIsASecret          # secret key that must be set in clients configuration
 ```
 
@@ -82,9 +86,13 @@ poolmaxsize : 100                    # Maximum number of concurrent open (TCP) c
 #blacklist :                         # Forbidden destination ( deny nothing if empty )
 # - method : ".*"                    #   Applied in order before whitelist
 #   url : ".*forbidden.*"            #   None must match
+#   headers :                        #   Optinal header check
+#     X-CUSTOM-HEADER : "^value$"    # 
 #whitelist :                         # Allowed destinations  ( allow all if empty )
 # - method : "^GET$"                 #   Applied in order after blacklist
-#   url : "^https://.*"              #   One must match
+#   url : "http(s)?://.*$"           #   One must match
+#   headers :                        #   Optinal header check
+#     X-CUSTOM-HEADER : "^value$"    # 
 # secretkey : ThisIsASecret          # secret key that must match the value set in servers configuration
 ```
 
