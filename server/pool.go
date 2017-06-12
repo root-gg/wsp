@@ -106,8 +106,8 @@ func (pool *Pool) Shutdown() {
 
 // PoolSize is the number of connection in each state in the pool
 type PoolSize struct {
-	Idle int
-	Busy int
+	Idle   int
+	Busy   int
 	Closed int
 }
 
