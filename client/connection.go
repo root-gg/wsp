@@ -148,7 +148,7 @@ func (connection *Connection) serve() {
 				if err != nil {
 					break
 				}
-				err = connection.error("Destination is not allowed")
+				err = connection.error("Destination is not allowed\n")
 				if err != nil {
 					break
 				}
