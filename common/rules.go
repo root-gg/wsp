@@ -6,20 +6,27 @@ import (
 	"regexp"
 )
 
-// Rule matchs HTTP requests to allow / deny access
+// Rule match HTTP requests to allow / deny access
 type Rule struct {
-	Method string
-	URL    string
+	Method  string
+	URL     string
+	Headers map[string]string
 
-	methodRegex *regexp.Regexp
-	urlRegex    *regexp.Regexp
+	methodRegex  *regexp.Regexp
+	urlRegex     *regexp.Regexp
+	headersRegex map[string]*regexp.Regexp
 }
 
-// NewRule create a new Rule
-func NewRule(method string, url string) (rule *Rule, err error) {
+// NewRule creates a new Rule
+func NewRule(method string, url string, headers map[string]string) (rule *Rule, err error) {
 	rule = new(Rule)
 	rule.Method = method
 	rule.URL = url
+	if headers != nil {
+		rule.Headers = headers
+	} else {
+		rule.Headers = make(map[string]string)
+	}
 	err = rule.Compile()
 	return
 }
@@ -38,6 +45,15 @@ func (rule *Rule) Compile() (err error) {
 			return
 		}
 	}
+	rule.headersRegex = make(map[string]*regexp.Regexp)
+	for header, regexStr := range rule.Headers {
+		var regex *regexp.Regexp
+		regex, err = regexp.Compile(regexStr)
+		if err != nil {
+			return
+		}
+		rule.headersRegex[header] = regex
+	}
 	return
 }
 
@@ -49,9 +65,16 @@ func (rule *Rule) Match(req *http.Request) bool {
 	if rule.urlRegex != nil && !rule.urlRegex.MatchString(req.URL.String()) {
 		return false
 	}
+
+	for headerName, regex := range rule.headersRegex {
+		if !regex.MatchString(req.Header.Get(headerName)) {
+			return false
+		}
+	}
+
 	return true
 }
 
 func (rule *Rule) String() string {
-	return fmt.Sprintf("%s %s", rule.Method, rule.URL)
+	return fmt.Sprintf("%s %s %v", rule.Method, rule.URL, rule.Headers)
 }
