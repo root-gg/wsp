@@ -5,7 +5,7 @@ import (
 	"net/url"
 )
 
-// HTTPRequest is a serializable version of http.Request ( with only usefull fields )
+// HTTPRequest is a serializable version of net/http.Request ( with only usefull fields )
 type HTTPRequest struct {
 	Method        string
 	URL           string
@@ -13,8 +13,8 @@ type HTTPRequest struct {
 	ContentLength int64
 }
 
-// SerializeHTTPRequest create a new HTTPRequest from a http.Request
-func SerializeHTTPRequest(req *http.Request) (r *HTTPRequest) {
+// NewHTTPRequest creates a new HTTPRequest from a net/http.Request instance
+func NewHTTPRequest(req *http.Request) (r *HTTPRequest) {
 	r = new(HTTPRequest)
 	r.URL = req.URL.String()
 	r.Method = req.Method
@@ -23,8 +23,8 @@ func SerializeHTTPRequest(req *http.Request) (r *HTTPRequest) {
 	return
 }
 
-// UnserializeHTTPRequest create a new http.Request from a HTTPRequest
-func UnserializeHTTPRequest(req *HTTPRequest) (r *http.Request, err error) {
+// ToStdLibHTTPRequest creates a new net/http.Request from this HTTPRequest instance
+func (req *HTTPRequest) ToStdLibHTTPRequest() (r *http.Request, err error) {
 	r = new(http.Request)
 	r.Method = req.Method
 	r.URL, err = url.Parse(req.URL)

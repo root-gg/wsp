@@ -7,7 +7,6 @@ import (
 	"os/signal"
 
 	"github.com/root-gg/utils"
-
 	"github.com/root-gg/wsp/client"
 )
 

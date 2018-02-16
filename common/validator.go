@@ -1,6 +1,7 @@
 package common
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"regexp"
@@ -77,4 +78,52 @@ func (rule *Rule) Match(req *http.Request) bool {
 
 func (rule *Rule) String() string {
 	return fmt.Sprintf("%s %s %v", rule.Method, rule.URL, rule.Headers)
+}
+
+// Validate a net/http.Request against a Whitelist and a Blacklist
+// The blacklist is applied first. If non empty any match in this list will block the request
+// Then the whitelist is applied. If non empty, the request must match at least one rule of the whitelist
+type RequestValidator struct {
+	Blacklist []*Rule
+	Whitelist []*Rule
+}
+
+func (validator *RequestValidator) Initialize() (err error) {
+	// Compile the rules
+	for _, rule := range validator.Whitelist {
+		if err = rule.Compile(); err != nil {
+			return err
+		}
+	}
+
+	for _, rule := range validator.Blacklist {
+		if err = rule.Compile(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// Validate apply the Whitelist and the Blacklist rules to the net/http.Request
+func (validator *RequestValidator) Validate(req *http.Request) (err error) {
+	// Apply blacklist
+	if len(validator.Blacklist) > 0 {
+		for _, rule := range validator.Blacklist {
+			if rule.Match(req) {
+				return errors.New("Destination is forbidden")
+			}
+		}
+	}
+
+	// Apply whitelist
+	if len(validator.Whitelist) > 0 {
+		for _, rule := range validator.Whitelist {
+			if rule.Match(req) {
+				return nil
+			}
+		}
+		return errors.New("Destination is not allowed")
+	}
+
+	return nil
 }

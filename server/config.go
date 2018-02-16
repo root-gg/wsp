@@ -2,6 +2,7 @@ package server
 
 import (
 	"io/ioutil"
+	"time"
 
 	"gopkg.in/yaml.v2"
 
@@ -12,8 +13,8 @@ import (
 type Config struct {
 	Host        string
 	Port        int
-	Timeout     int
-	IdleTimeout int
+	Timeout     time.Duration
+	IdleTimeout time.Duration
 	Whitelist   []*common.Rule
 	Blacklist   []*common.Rule
 	SecretKey   string
@@ -24,10 +25,8 @@ func NewConfig() (config *Config) {
 	config = new(Config)
 	config.Host = "127.0.0.1"
 	config.Port = 8080
-	config.Timeout = 1000
-	config.IdleTimeout = 60000
-	config.Whitelist = make([]*common.Rule, 0)
-	config.Blacklist = make([]*common.Rule, 0)
+	config.Timeout = time.Second
+	config.IdleTimeout = 60 * time.Second
 	return
 }
 
