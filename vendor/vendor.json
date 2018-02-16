@@ -1,0 +1,19 @@
+{
+	"comment": "",
+	"ignore": "",
+	"package": [
+		{
+			"checksumSHA1": "R4/ihQWY3Tc1gYMi82TzQNaN9EE=",
+			"path": "github.com/petermattis/goid",
+			"revision": "b0b1615b78e5ee59739545bb38426383b2cda4c9",
+			"revisionTime": "2018-02-02T15:45:49Z"
+		},
+		{
+			"checksumSHA1": "ASn3tlENWM1lJRIAnWNFGB25aHI=",
+			"path": "github.com/sasha-s/go-deadlock",
+			"revision": "933accf1f625c0ca6d1c2c0d26a7f62fcbf5ac12",
+			"revisionTime": "2018-02-19T11:50:54Z"
+		}
+	],
+	"rootPath": "github.com/root-gg/wsp"
+}

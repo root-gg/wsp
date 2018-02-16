@@ -2,106 +2,153 @@ package server
 
 import (
 	"log"
-	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/sasha-s/go-deadlock"
+
+	"github.com/root-gg/wsp/common"
 )
 
 // Pool handle all connections from a remote Proxy
 type Pool struct {
 	server *Server
-	id     string
 
-	size int
+	clientSettings *common.ClientSettings
 
-	connections []*Connection
-	idle        chan *Connection
+	// This map is only here to provide a way to display statistics
+	// about the connections in the pool
+	connections map[*Connection]struct{}
 
-	done bool
-	lock sync.RWMutex
+	stack *ConnectionStack
+
+	done chan struct{}
+	lock deadlock.Mutex
 }
 
 // NewPool creates a new Pool
-func NewPool(server *Server, id string) (pool *Pool) {
+func NewPool(server *Server, clientSettings *common.ClientSettings) (pool *Pool) {
 	pool = new(Pool)
 	pool.server = server
-	pool.id = id
-	pool.idle = make(chan *Connection)
+	pool.clientSettings = clientSettings
+	pool.stack = newConnectionStack()
+	pool.done = make(chan struct{})
+	pool.connections = make(map[*Connection]struct{})
+
+	ticker := time.NewTicker(time.Second)
+	go func() {
+	LOOP:
+		for {
+			select {
+			case <-ticker.C:
+				pool.clean()
+			case <-pool.done:
+				break LOOP
+			}
+		}
+	}()
+
 	return
 }
 
 // Register creates a new Connection and adds it to the pool
-func (pool *Pool) Register(ws *websocket.Conn) {
+func (pool *Pool) register(id uint64, ws *websocket.Conn) {
 	pool.lock.Lock()
 	defer pool.lock.Unlock()
 
 	// Ensure we never add a connection to a pool we have garbage collected
-	if pool.done {
+	if pool.isClosed() {
 		return
 	}
 
-	log.Printf("Registering new connection from %s", pool.id)
-	connection := NewConnection(pool, ws)
-	pool.connections = append(pool.connections, connection)
+	log.Printf("Registering new connection %d from %s (%s)", id, pool.clientSettings.Name, pool.clientSettings.ID)
+
+	connection := newConnection(id, ws, pool.offer)
+
+	// Keep track of the connections in the pool
+	pool.connections[connection] = struct{}{}
+
+	// Automatically remove connection from the pool on close
+	go func() {
+		<-connection.done
+		log.Printf("Connection %d from %s (%s) has been closed", id, pool.clientSettings.Name, pool.clientSettings.ID)
+		pool.lock.Lock()
+		defer pool.lock.Unlock()
+		delete(pool.connections, connection)
+	}()
+
+	// Jump that lock
+	pool.offer(connection)
 
 	return
 }
 
 // Offer an idle connection to the server
-func (pool *Pool) Offer(connection *Connection) {
-	go func() { pool.idle <- connection }()
+func (pool *Pool) offer(connection *Connection) {
+	pool.stack.in <- connection
 }
 
-// Clean removes dead connection from the pool
-// Look for dead connection in the pool
-// This MUST be surrounded by pool.lock.Lock()
-func (pool *Pool) Clean() {
-	idle := 0
-	var connections []*Connection
+// Clean tries to keep at most poolSize idle connection in the pool.
+// Connections are left open for Config.IdleTimeout before being closed.
+// Only the server is allowed to close connection to avoid that the client
+// closes a connection about to be used to proxy a request.
+func (pool *Pool) clean() {
+	pool.lock.Lock()
+	defer pool.lock.Unlock()
 
-	for _, connection := range pool.connections {
-		// We need to be sur we'll never close a BUSY or soon to be BUSY connection
-		connection.lock.Lock()
-		if connection.status == IDLE {
-			idle++
-			if idle > pool.size {
-				// We have enough idle connections in the pool.
-				// Terminate the connection if it is idle since more that IdleTimeout
-				if int(time.Now().Sub(connection.idleSince).Seconds())*1000 > pool.server.Config.IdleTimeout {
-					connection.close()
-				}
-			}
-		}
-		connection.lock.Unlock()
-		if connection.status == CLOSED {
+	if len(pool.connections) == 0 {
+		// Close an empty pool
+		close(pool.done)
+		pool.stack.close()
+		return
+	}
+
+	idle := 0
+	for conn := range pool.connections {
+		// Remove CLOSED connections
+		status, idleSince := conn.getStatus()
+		if status != IDLE {
 			continue
 		}
-		connections = append(connections, connection)
+		idle++
+		// Keep at most PoolSize IDLE connection
+		if idle <= pool.clientSettings.PoolSize {
+			continue
+		}
+		// Grace period before closing connection > PoolSize
+		if time.Since(idleSince) > pool.server.Config.IdleTimeout {
+			conn.close()
+		}
 	}
-	pool.connections = connections
 }
 
-// IsEmpty clean the pool and return true if the pool is empty
-func (pool *Pool) IsEmpty() bool {
+// isClosed returns true if the pool had been closed
+func (pool *Pool) isClosed() bool {
+	select {
+	case <-pool.done:
+		return true
+	default:
+		return false
+	}
+}
+
+// Close every connections in the pool and clean it
+func (pool *Pool) close() {
 	pool.lock.Lock()
 	defer pool.lock.Unlock()
 
-	pool.Clean()
-	return len(pool.connections) == 0
-}
-
-// Shutdown closes every connections in the pool and cleans it
-func (pool *Pool) Shutdown() {
-	pool.lock.Lock()
-	defer pool.lock.Unlock()
-
-	pool.done = true
-
-	for _, connection := range pool.connections {
-		connection.Close()
+	if pool.isClosed() {
+		log.Println("pool alreadey closed")
+		return
 	}
-	pool.Clean()
+
+	close(pool.done)
+
+	pool.stack.close()
+
+	for conn := range pool.connections {
+		conn.close()
+	}
 }
 
 // PoolSize is the number of connection in each state in the pool
@@ -109,6 +156,7 @@ type PoolSize struct {
 	Idle   int
 	Busy   int
 	Closed int
+	Total  int
 }
 
 // Size return the number of connection in each state in the pool
@@ -117,14 +165,16 @@ func (pool *Pool) Size() (ps *PoolSize) {
 	defer pool.lock.Unlock()
 
 	ps = new(PoolSize)
-	for _, connection := range pool.connections {
-		if connection.status == IDLE {
+	for connection := range pool.connections {
+		status, _ := connection.getStatus()
+		if status == IDLE {
 			ps.Idle++
-		} else if connection.status == BUSY {
+		} else if status == BUSY {
 			ps.Busy++
-		} else if connection.status == CLOSED {
+		} else if status == CLOSED {
 			ps.Closed++
 		}
+		ps.Total++
 	}
 
 	return

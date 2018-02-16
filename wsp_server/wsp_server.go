@@ -7,11 +7,11 @@ import (
 	"os/signal"
 
 	"github.com/root-gg/utils"
-
 	"github.com/root-gg/wsp/server"
 )
 
 func main() {
+
 	configFile := flag.String("config", "wsp_server.cfg", "config file path")
 	flag.Parse()
 
