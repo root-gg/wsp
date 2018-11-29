@@ -26,6 +26,14 @@ in a random way to all the WSP clients.
 
 ![wsp schema](https://cloud.githubusercontent.com/assets/6413246/24397653/3f2e4b30-13a7-11e7-820b-cde6e784382f.png)
 
+
+Get code
+--------
+```
+go get github.com/root-gg/wsp
+```
+
+
 WSP server configuration
 ------------------------
 
@@ -50,7 +58,7 @@ idletimeout : 60000                  # Time to wait before closing idle connecti
 ```
 
 ```
-$ cd wsp_client && go build
+$ cd wsp_server && go build
 $ ./wsp_server -config wsp_server.cfg
 {
   "Host": "127.0.0.1",
