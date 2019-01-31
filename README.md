@@ -42,19 +42,19 @@ WSP server configuration
 ---
 host : 127.0.0.1                     # Address to bind the HTTP server
 port : 8080                          # Port to bind the HTTP server
-timeout : 1000                       # Time to wait before acquiring a WS connection to forward the request (milliseconds)
-idletimeout : 60000                  # Time to wait before closing idle connection when there is enough idle connections (milliseconds)
+timeout : 1s                         # Time to wait before acquiring a WS connection to forward the request
+idletimeout : 60s                    # Time to wait before closing idle connection when there is enough idle connections
 #blacklist :                         # Forbidden destination ( deny nothing if empty )
 # - method : ".*"                    #   Applied in order before whitelist
 #   url : "^http(s)?://google.*"     #   None must match
 #   headers :                        #   Optinal header check
-#     X-CUSTOM-HEADER : "^value$"    # 
+#     X-CUSTOM-HEADER : "^value$"    #
 #whitelist :                         # Allowed destinations  ( allow all if empty )
 # - method : "^GET$"                 #   Applied in order after blacklist
 #   url : "^http(s)?://.*$"          #   One must match
 #   headers :                        #   Optinal header check
-#     X-CUSTOM-HEADER : "^value$"    # 
-# secretkey : ThisIsASecret          # secret key that must be set in clients configuration
+#     X-CUSTOM-HEADER : "^value$"    #
+#secretkey : ThisIsASecret           # shared secret key that must match the value set in clients configuration
 ```
 
 ```
@@ -91,23 +91,20 @@ targets :                            # Endpoints to connect to
  - ws://127.0.0.1:8080/register      #
 poolidlesize : 10                    # Default number of concurrent open (TCP) connections to keep idle per WSP server
 poolmaxsize : 100                    # Maximum number of concurrent open (TCP) connections per WSP server
+#insecureskipverify : true           # Disable the http client certificate chain and hostname verification
 #blacklist :                         # Forbidden destination ( deny nothing if empty )
 # - method : ".*"                    #   Applied in order before whitelist
 #   url : ".*forbidden.*"            #   None must match
 #   headers :                        #   Optinal header check
-#     X-CUSTOM-HEADER : "^value$"    # 
+#     X-CUSTOM-HEADER : "^value$"    #
 #whitelist :                         # Allowed destinations  ( allow all if empty )
 # - method : "^GET$"                 #   Applied in order after blacklist
 #   url : "http(s)?://.*$"           #   One must match
 #   headers :                        #   Optinal header check
-#     X-CUSTOM-HEADER : "^value$"    # 
-# secretkey : ThisIsASecret          # secret key that must match the value set in servers configuration
+#     X-CUSTOM-HEADER : "^value$"    #
+# secretkey : ThisIsASecret          # shared secret key that must match the value set in servers configuration
 ```
 
- - poolMinSize is the default number of opened TCP/HTTP/WS connections
- to open per WSP server. If there is a burst of simpultaneous requests 
- the number of open connection will rise and then decrease back to this
- number.
  - poolMinIdleSize is the number of connection to keep idle, meaning
  that if there is more than this number of simultaneous requests the
  WSP client will try to open more connections to keep idle connection.

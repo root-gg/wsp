@@ -12,109 +12,146 @@ import (
 
 	"github.com/gorilla/websocket"
 
+	"errors"
 	"github.com/root-gg/wsp/common"
 )
 
 // Status of a Connection
+type ConnectionStatus int
+type WSHandler func(reader io.Reader) error
+
 const (
-	IDLE = iota
+	IDLE ConnectionStatus = iota
 	BUSY
 	CLOSED
 )
 
-// Connection manage a single websocket connection from
+// Connection manage a single WebSocket connection from a WSP client
 type Connection struct {
-	pool         *Pool
-	ws           *websocket.Conn
-	status       int
-	idleSince    time.Time
-	lock         sync.Mutex
-	nextResponse chan chan io.Reader
+	id uint64
+	ws *websocket.Conn
+
+	status ConnectionStatus
+	lock   sync.RWMutex
+
+	nextReader chan func(io.Reader)
+
+	releaser  func(conn *Connection)
+	idleSince time.Time
+
+	done chan struct{}
 }
 
-// NewConnection return a new Connection
-func NewConnection(pool *Pool, ws *websocket.Conn) (connection *Connection) {
-	connection = new(Connection)
-	connection.pool = pool
-	connection.ws = ws
-	connection.nextResponse = make(chan chan io.Reader)
+// newConnection return a new Connection
+func newConnection(id uint64, ws *websocket.Conn, releaser func(conn *Connection)) (conn *Connection) {
+	conn = new(Connection)
+	conn.id = id
+	conn.ws = ws
+	conn.releaser = releaser
+	conn.nextReader = make(chan func(io.Reader), 1)
+	conn.done = make(chan struct{})
 
-	connection.Release()
-
-	go connection.read()
+	go conn.read()
 
 	return
 }
 
-// read the incoming message of the connection
-func (connection *Connection) read() {
+// Get the status of the connection in a concurrently safe way
+func (conn *Connection) getStatus() ConnectionStatus {
+	conn.lock.RLock()
+	defer conn.lock.RUnlock()
+	return conn.status
+}
+
+// Handle next message pass a function to process the next WebSocket message
+// to the read goroutine. Only one message can be handled at a time.
+// This method blocks until the handler has returned.
+func (conn *Connection) handleNextMessage(h WSHandler) error {
+	done := make(chan error)
+	h2 := func(reader io.Reader) {
+		done <- h(reader)
+	}
+
+	select {
+	case conn.nextReader <- h2:
+	case <-conn.done:
+		return errors.New("connection closed")
+	default:
+		return errors.New("already reading")
+	}
+
+	select {
+	case err := <-done:
+		return err
+	case <-conn.done:
+		return errors.New("connection closed")
+	}
+}
+
+// read the incoming message of the WebSocket connection
+func (conn *Connection) read() {
 	defer func() {
 		if r := recover(); r != nil {
 			log.Printf("Websocket crash recovered : %s", r)
 		}
-		connection.Close()
+		conn.close()
 	}()
 
 	for {
-		if connection.status == CLOSED {
-			break
-		}
-
 		// https://godoc.org/github.com/gorilla/websocket#hdr-Control_Messages
 		//
 		// We need to ensure :
 		//  - no concurrent calls to ws.NextReader() / ws.ReadMessage()
 		//  - only one reader exists at a time
 		//  - wait for reader to be consumed before requesting the next one
-		//  - always be reading on the socket to be able to process control messages ( ping / pong / close )
+		//  - always be reading on the socket to be able to process control messages ( ping / pong / closeNoLock )
 
 		// We will block here until a message is received or the ws is closed
-		_, reader, err := connection.ws.NextReader()
+		_, ioReader, err := conn.ws.NextReader()
 		if err != nil {
+			if !conn.isClosed() {
+				log.Printf("WebSocket error : %s", err)
+			}
 			break
 		}
 
-		if connection.status != BUSY {
+		if conn.getStatus() != BUSY {
 			// We received a wild unexpected message
+			log.Printf("Unexpected wild message received")
 			break
 		}
 
-		// We received a message from the proxy
-		// It is expected to be either a HttpResponse or a HttpResponseBody
-		// We wait for proxyRequest to send a channel to get the message
-		c := <-connection.nextResponse
-		if c == nil {
-			// We have been unlocked by Close()
+		select {
+		case f := <-conn.nextReader:
+			f(ioReader)
+			// Ensure we have consumed the all the ioReader
+			_, err = ioutil.ReadAll(ioReader)
+			if err != nil {
+				log.Printf("Unable to clean io reader")
+				break
+			}
+		case <-conn.done:
 			break
 		}
-
-		// Send the reader back to proxyRequest
-		c <- reader
-
-		// Wait for proxyRequest to close the channel
-		// this notify that it is done with the reader
-		<-c
 	}
 }
 
-// Proxy a HTTP request through the Proxy over the websocket connection
-func (connection *Connection) proxyRequest(w http.ResponseWriter, r *http.Request) (err error) {
-	log.Printf("proxy request to %s", connection.pool.id)
-
+// Proxy a HTTP request through the Proxy over the WebSocket connection
+func (conn *Connection) proxyRequest(w http.ResponseWriter, r *http.Request) (err error) {
 	// Serialize HTTP request
-	jsonReq, err := json.Marshal(common.SerializeHTTPRequest(r))
+	jsonReq, err := json.Marshal(common.NewHTTPRequest(r))
 	if err != nil {
 		return fmt.Errorf("Unable to serialize request : %s", err)
 	}
 
 	// Send the serialized HTTP request to the remote Proxy
-	err = connection.ws.WriteMessage(websocket.TextMessage, jsonReq)
+	err = conn.ws.WriteMessage(websocket.TextMessage, jsonReq)
 	if err != nil {
 		return fmt.Errorf("Unable to write request : %s", err)
 	}
 
 	// Pipe the HTTP request body to the remote Proxy
-	bodyWriter, err := connection.ws.NextWriter(websocket.BinaryMessage)
+	bodyWriter, err := conn.ws.NextWriter(websocket.BinaryMessage)
 	if err != nil {
 		return fmt.Errorf("Unable to get request body writer : %s", err)
 	}
@@ -124,131 +161,109 @@ func (connection *Connection) proxyRequest(w http.ResponseWriter, r *http.Reques
 	}
 	err = bodyWriter.Close()
 	if err != nil {
-		return fmt.Errorf("Unable to pipe request body (close) : %s", err)
+		return fmt.Errorf("Unable to pipe request body (closeNoLock) : %s", err)
 	}
 
-	// Get the serialized HTTP Response from the remote Proxy
-	// To do so send a new channel to the read() goroutine
-	// to get the next message reader
-	responseChannel := make(chan (io.Reader))
-	connection.nextResponse <- responseChannel
-	responseReader, more := <-responseChannel
-	if responseReader == nil {
-		if more {
-			// If more is false the channel is already closed
-			close(responseChannel)
+	err = conn.handleNextMessage(func(reader io.Reader) (err error) {
+
+		// Deserialize the HTTP Response
+		httpResponse := new(common.HTTPResponse)
+		err = json.NewDecoder(reader).Decode(httpResponse)
+		if err != nil {
+			return fmt.Errorf("Unable to unserialize http response : %s", err)
 		}
-		return fmt.Errorf("Unable to get http response reader : %s", err)
-	}
 
-	// Read the HTTP Response
-	jsonResponse, err := ioutil.ReadAll(responseReader)
-	if err != nil {
-		close(responseChannel)
-		return fmt.Errorf("Unable to read http response : %s", err)
-	}
-
-	// Notify the read() goroutine that we are done reading the response
-	close(responseChannel)
-
-	// Deserialize the HTTP Response
-	httpResponse := new(common.HTTPResponse)
-	err = json.Unmarshal(jsonResponse, httpResponse)
-	if err != nil {
-		return fmt.Errorf("Unable to unserialize http response : %s", err)
-	}
-
-	// Write response headers back to the client
-	for header, values := range httpResponse.Header {
-		for _, value := range values {
-			w.Header().Add(header, value)
+		// Write response headers back to the client
+		for header, values := range httpResponse.Header {
+			for _, value := range values {
+				w.Header().Add(header, value)
+			}
 		}
-	}
-	w.WriteHeader(httpResponse.StatusCode)
 
-	// Get the HTTP Response body from the remote Proxy
-	// To do so send a new channel to the read() goroutine
-	// to get the next message reader
-	responseBodyChannel := make(chan (io.Reader))
-	connection.nextResponse <- responseBodyChannel
-	responseBodyReader, more := <-responseBodyChannel
-	if responseBodyReader == nil {
-		if more {
-			// If more is false the channel is already closed
-			close(responseChannel)
-		}
-		return fmt.Errorf("Unable to get http response body reader : %s", err)
-	}
+		w.WriteHeader(httpResponse.StatusCode)
 
-	// Pipe the HTTP response body right from the remote Proxy to the client
-	_, err = io.Copy(w, responseBodyReader)
+		return nil
+	})
 	if err != nil {
-		close(responseBodyChannel)
-		return fmt.Errorf("Unable to pipe response body : %s", err)
+		return fmt.Errorf("Unable to handle request : %s", err)
 	}
 
-	// Notify read() that we are done reading the response body
-	close(responseBodyChannel)
+	err = conn.handleNextMessage(func(reader io.Reader) (err error) {
+		// Pipe the HTTP response body right from the remote Proxy to the client
+		_, err = io.Copy(w, reader)
+		if err != nil {
+			return fmt.Errorf("Unable to pipe response body : %s", err)
+		}
 
-	connection.Release()
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("Unable to handle request body : %s", err)
+	}
 
-	return
+	// Put the connection back in the pool
+	conn.release()
+
+	return nil
 }
 
 // Take notifies that this connection is going to be used
-func (connection *Connection) Take() bool {
-	connection.lock.Lock()
-	defer connection.lock.Unlock()
+func (conn *Connection) take() bool {
+	conn.lock.Lock()
+	defer conn.lock.Unlock()
 
-	if connection.status == CLOSED {
+	if conn.isClosed() {
 		return false
 	}
 
-	if connection.status == BUSY {
+	if conn.status != IDLE {
 		return false
 	}
 
-	connection.status = BUSY
+	conn.status = BUSY
+
 	return true
 }
 
 // Release notifies that this connection is ready to use again
-func (connection *Connection) Release() {
-	connection.lock.Lock()
-	defer connection.lock.Unlock()
+func (conn *Connection) release() {
+	conn.lock.Lock()
+	defer conn.lock.Unlock()
 
-	if connection.status == CLOSED {
+	if conn.isClosed() {
 		return
 	}
 
-	connection.idleSince = time.Now()
-	connection.status = IDLE
+	conn.idleSince = time.Now()
+	conn.status = IDLE
 
-	go connection.pool.Offer(connection)
+	// Add the connection back to the pool
+	conn.releaser(conn)
+}
+
+// IsClosed return true if the connection has been closed
+func (conn *Connection) isClosed() bool {
+	select {
+	case <-conn.done:
+		return true
+	default:
+		return false
+	}
 }
 
 // Close the connection
-func (connection *Connection) Close() {
-	connection.lock.Lock()
-	defer connection.lock.Unlock()
+func (conn *Connection) close() {
+	conn.lock.Lock()
+	defer conn.lock.Unlock()
 
-	connection.close()
-}
-
-// Close the connection ( without lock )
-func (connection *Connection) close() {
-	if connection.status == CLOSED {
+	if conn.isClosed() {
 		return
 	}
 
-	log.Printf("Closing connection from %s", connection.pool.id)
+	conn.status = CLOSED
 
-	// This one will be executed *before* lock.Unlock()
-	defer func() { connection.status = CLOSED }()
+	close(conn.done)
 
-	// Unlock a possible read() wild message
-	close(connection.nextResponse)
-
-	// Close the underlying TCP connection
-	connection.ws.Close()
+	// Close the underlying TCP conn
+	conn.ws.Close()
 }
