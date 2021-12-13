@@ -33,6 +33,20 @@ Get code
 go get github.com/root-gg/wsp
 ```
 
+Build
+-----
+
+- Build client (wsp client)
+
+```
+make build-client
+```
+
+- Build server (wsp server)
+
+```
+make build-server
+```
 
 WSP server configuration
 ------------------------
@@ -58,7 +72,6 @@ idletimeout : 60000                  # Time to wait before closing idle connecti
 ```
 
 ```
-$ cd wsp_server && go build
 $ ./wsp_server -config wsp_server.cfg
 {
   "Host": "127.0.0.1",
@@ -115,7 +128,6 @@ poolmaxsize : 100                    # Maximum number of concurrent open (TCP) c
  the proxy will ever initiate per WSP server.
 
 ```
-$ cd wsp_client && go build
 $ ./wsp_client -config wsp_client.cfg
 {
   "ID": "7e2d8782-f893-4ff3-7e9d-299b4c0a518a",
