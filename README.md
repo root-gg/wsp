@@ -26,11 +26,13 @@ in a random way to all the WSP clients.
 
 ![wsp schema](https://cloud.githubusercontent.com/assets/6413246/24397653/3f2e4b30-13a7-11e7-820b-cde6e784382f.png)
 
+Example
+-------
 
-Get code
---------
-```
-go get github.com/root-gg/wsp
+- Start a test server
+
+```bash
+make run-test-server 
 ```
 
 Build
@@ -38,13 +40,13 @@ Build
 
 - Build client (wsp client)
 
-```
+```bash
 make build-client
 ```
 
 - Build server (wsp server)
 
-```
+```bash
 make build-server
 ```
 
@@ -117,14 +119,14 @@ poolmaxsize : 100                    # Maximum number of concurrent open (TCP) c
 # secretkey : ThisIsASecret          # secret key that must match the value set in servers configuration
 ```
 
- - poolMinSize is the default number of opened TCP/HTTP/WS connections
- to open per WSP server. If there is a burst of simpultaneous requests 
+- poolMinSize is the default number of opened TCP/HTTP/WS connections
+ to open per WSP server. If there is a burst of simpultaneous requests
  the number of open connection will rise and then decrease back to this
  number.
- - poolMinIdleSize is the number of connection to keep idle, meaning
+- poolMinIdleSize is the number of connection to keep idle, meaning
  that if there is more than this number of simultaneous requests the
  WSP client will try to open more connections to keep idle connection.
- - poolMaxSize is the maximum number of simultaneous connection that
+- poolMaxSize is the maximum number of simultaneous connection that
  the proxy will ever initiate per WSP server.
 
 ```
@@ -158,3 +160,4 @@ Client
 $ curl -H 'X-PROXY-DESTINATION: https://google.fr' http://127.0.0.1:8080/request
 <!doctype html><html itemscope="" itemtype="http://schema.org/WebPage" lang="fr"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"><meta content="/images/branding/googleg/1x/googleg_standard_color_128dp.png" it...
 ```
+
