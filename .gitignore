@@ -5,8 +5,8 @@ ssl/
 *.crt
 
 ## Built binaries
-./wsp_server
-./wsp_client
+/wsp_server
+/wsp_client
 test_api/test_api
 
 # IntelliJ IDEA
