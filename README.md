@@ -26,15 +26,6 @@ in a random way to all the WSP clients.
 
 ![wsp schema](https://cloud.githubusercontent.com/assets/6413246/24397653/3f2e4b30-13a7-11e7-820b-cde6e784382f.png)
 
-Example
--------
-
-- Start a test server
-
-```bash
-make run-test-server 
-```
-
 Build
 -----
 
@@ -48,6 +39,54 @@ make build-client
 
 ```bash
 make build-server
+```
+
+Example
+-------
+
+- Start a test server
+
+```bash
+make run-test-server 
+```
+
+- Start wsp server
+
+```bash
+$ ./wsp_server -config examples/wsp_server.cfg
+{
+  "Host": "127.0.0.1",
+  "Port": 8080,
+  "Timeout": 1000,
+  "IdleTimeout": 60000,
+  "Whitelist": [],
+  "Blacklist": [],
+  "SecretKey": ""
+}
+```
+
+- Start wsp client
+
+```bash
+$ ./wsp_client -config examples/wsp_client.cfg
+{
+  "ID": "4b98d5a0-6794-421c-6a66-20f3edd81174",
+  "Targets": [
+    "ws://127.0.0.1:8080/register"
+  ],
+  "PoolIdleSize": 1,
+  "PoolMaxSize": 100,
+  "Whitelist": [],
+  "Blacklist": [],
+  "SecretKey": ""
+}
+```
+
+- Try to connect the test server from outside of the internal network
+
+```bash
+$ curl -H 'X-PROXY-DESTINATION: http://localhost:8081/hello' http://127.0.0.1:8080/request
+hello world
 ```
 
 WSP server configuration
