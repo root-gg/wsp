@@ -3,10 +3,10 @@ package client
 import (
 	"io/ioutil"
 
-	"github.com/nu7hatch/gouuid"
+	uuid "github.com/nu7hatch/gouuid"
 	"gopkg.in/yaml.v2"
 
-	"github.com/root-gg/wsp/common"
+	"github.com/root-gg/wsp"
 )
 
 // Config configures an Proxy
@@ -15,8 +15,8 @@ type Config struct {
 	Targets      []string
 	PoolIdleSize int
 	PoolMaxSize  int
-	Whitelist    []*common.Rule
-	Blacklist    []*common.Rule
+	Whitelist    []*wsp.Rule
+	Blacklist    []*wsp.Rule
 	SecretKey    string
 }
 
@@ -34,8 +34,8 @@ func NewConfig() (config *Config) {
 	config.PoolIdleSize = 10
 	config.PoolMaxSize = 100
 
-	config.Whitelist = make([]*common.Rule, 0)
-	config.Blacklist = make([]*common.Rule, 0)
+	config.Whitelist = make([]*wsp.Rule, 0)
+	config.Blacklist = make([]*wsp.Rule, 0)
 
 	return
 }

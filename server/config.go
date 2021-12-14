@@ -5,7 +5,7 @@ import (
 
 	"gopkg.in/yaml.v2"
 
-	"github.com/root-gg/wsp/common"
+	"github.com/root-gg/wsp"
 )
 
 // Config configures an Server
@@ -14,8 +14,8 @@ type Config struct {
 	Port        int
 	Timeout     int
 	IdleTimeout int
-	Whitelist   []*common.Rule
-	Blacklist   []*common.Rule
+	Whitelist   []*wsp.Rule
+	Blacklist   []*wsp.Rule
 	SecretKey   string
 }
 
@@ -26,8 +26,8 @@ func NewConfig() (config *Config) {
 	config.Port = 8080
 	config.Timeout = 1000
 	config.IdleTimeout = 60000
-	config.Whitelist = make([]*common.Rule, 0)
-	config.Blacklist = make([]*common.Rule, 0)
+	config.Whitelist = make([]*wsp.Rule, 0)
+	config.Blacklist = make([]*wsp.Rule, 0)
 	return
 }
 

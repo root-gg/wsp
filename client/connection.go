@@ -12,7 +12,7 @@ import (
 
 	"github.com/gorilla/websocket"
 
-	"github.com/root-gg/wsp/common"
+	"github.com/root-gg/wsp"
 )
 
 // Status of a Connection
@@ -100,14 +100,14 @@ func (connection *Connection) serve() {
 		go connection.pool.connector()
 
 		// Deserialize request
-		httpRequest := new(common.HTTPRequest)
+		httpRequest := new(wsp.HTTPRequest)
 		err = json.Unmarshal(jsonRequest, httpRequest)
 		if err != nil {
 			connection.error(fmt.Sprintf("Unable to deserialize json http request : %s\n", err))
 			break
 		}
 
-		req, err := common.UnserializeHTTPRequest(httpRequest)
+		req, err := wsp.UnserializeHTTPRequest(httpRequest)
 		if err != nil {
 			connection.error(fmt.Sprintf("Unable to deserialize http request : %v\n", err))
 			break
@@ -175,7 +175,7 @@ func (connection *Connection) serve() {
 		}
 
 		// Serialize response
-		jsonResponse, err := json.Marshal(common.SerializeHTTPResponse(resp))
+		jsonResponse, err := json.Marshal(wsp.SerializeHTTPResponse(resp))
 		if err != nil {
 			err = connection.error(fmt.Sprintf("Unable to serialize response : %v\n", err))
 			if err != nil {
@@ -207,7 +207,7 @@ func (connection *Connection) serve() {
 }
 
 func (connection *Connection) error(msg string) (err error) {
-	resp := common.NewHTTPResponse()
+	resp := wsp.NewHTTPResponse()
 	resp.StatusCode = 527
 
 	log.Println(msg)

@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/root-gg/wsp/common"
+	"github.com/root-gg/wsp"
 )
 
 // Server is a Reverse HTTP Proxy over WebSocket
@@ -186,12 +186,12 @@ func (server *Server) request(w http.ResponseWriter, r *http.Request) {
 	// Parse destination URL
 	dstURL := r.Header.Get("X-PROXY-DESTINATION")
 	if dstURL == "" {
-		common.ProxyErrorf(w, "Missing X-PROXY-DESTINATION header")
+		wsp.ProxyErrorf(w, "Missing X-PROXY-DESTINATION header")
 		return
 	}
 	URL, err := url.Parse(dstURL)
 	if err != nil {
-		common.ProxyErrorf(w, "Unable to parse X-PROXY-DESTINATION header")
+		wsp.ProxyErrorf(w, "Unable to parse X-PROXY-DESTINATION header")
 		return
 	}
 	r.URL = URL
@@ -202,7 +202,7 @@ func (server *Server) request(w http.ResponseWriter, r *http.Request) {
 	if len(server.Config.Blacklist) > 0 {
 		for _, rule := range server.Config.Blacklist {
 			if rule.Match(r) {
-				common.ProxyErrorf(w, "Destination is forbidden")
+				wsp.ProxyErrorf(w, "Destination is forbidden")
 				return
 			}
 		}
@@ -218,13 +218,13 @@ func (server *Server) request(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		if !allowed {
-			common.ProxyErrorf(w, "Destination is not allowed")
+			wsp.ProxyErrorf(w, "Destination is not allowed")
 			return
 		}
 	}
 
 	if len(server.pools) == 0 {
-		common.ProxyErrorf(w, "No proxy available")
+		wsp.ProxyErrorf(w, "No proxy available")
 		return
 	}
 
@@ -233,7 +233,7 @@ func (server *Server) request(w http.ResponseWriter, r *http.Request) {
 	server.dispatcher <- request
 	connection := <-request.connection
 	if connection == nil {
-		common.ProxyErrorf(w, "Unable to get a proxy connection")
+		wsp.ProxyErrorf(w, "Unable to get a proxy connection")
 		return
 	}
 
@@ -246,7 +246,7 @@ func (server *Server) request(w http.ResponseWriter, r *http.Request) {
 
 		// Try to return an error to the client
 		// This might fail if response headers have already been sent
-		common.ProxyError(w, err)
+		wsp.ProxyError(w, err)
 	}
 }
 
@@ -254,20 +254,20 @@ func (server *Server) request(w http.ResponseWriter, r *http.Request) {
 func (server *Server) register(w http.ResponseWriter, r *http.Request) {
 	secretKey := r.Header.Get("X-SECRET-KEY")
 	if secretKey != server.Config.SecretKey {
-		common.ProxyErrorf(w, "Invalid X-SECRET-KEY")
+		wsp.ProxyErrorf(w, "Invalid X-SECRET-KEY")
 		return
 	}
 
 	ws, err := server.upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		common.ProxyErrorf(w, "HTTP upgrade error : %v", err)
+		wsp.ProxyErrorf(w, "HTTP upgrade error : %v", err)
 		return
 	}
 
 	// The first message should contains the remote Proxy name and size
 	_, greeting, err := ws.ReadMessage()
 	if err != nil {
-		common.ProxyErrorf(w, "Unable to read greeting message : %s", err)
+		wsp.ProxyErrorf(w, "Unable to read greeting message : %s", err)
 		ws.Close()
 		return
 	}
@@ -277,7 +277,7 @@ func (server *Server) register(w http.ResponseWriter, r *http.Request) {
 	id := split[0]
 	size, err := strconv.Atoi(split[1])
 	if err != nil {
-		common.ProxyErrorf(w, "Unable to parse greeting message : %s", err)
+		wsp.ProxyErrorf(w, "Unable to parse greeting message : %s", err)
 		ws.Close()
 		return
 	}

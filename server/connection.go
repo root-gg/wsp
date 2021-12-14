@@ -12,7 +12,7 @@ import (
 
 	"github.com/gorilla/websocket"
 
-	"github.com/root-gg/wsp/common"
+	"github.com/root-gg/wsp"
 )
 
 // Status of a Connection
@@ -102,7 +102,7 @@ func (connection *Connection) proxyRequest(w http.ResponseWriter, r *http.Reques
 	log.Printf("proxy request to %s", connection.pool.id)
 
 	// Serialize HTTP request
-	jsonReq, err := json.Marshal(common.SerializeHTTPRequest(r))
+	jsonReq, err := json.Marshal(wsp.SerializeHTTPRequest(r))
 	if err != nil {
 		return fmt.Errorf("Unable to serialize request : %s", err)
 	}
@@ -152,7 +152,7 @@ func (connection *Connection) proxyRequest(w http.ResponseWriter, r *http.Reques
 	close(responseChannel)
 
 	// Deserialize the HTTP Response
-	httpResponse := new(common.HTTPResponse)
+	httpResponse := new(wsp.HTTPResponse)
 	err = json.Unmarshal(jsonResponse, httpResponse)
 	if err != nil {
 		return fmt.Errorf("Unable to unserialize http response : %s", err)
