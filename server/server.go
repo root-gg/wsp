@@ -75,8 +75,8 @@ func (server *Server) Start() {
 	}()
 
 	r := http.NewServeMux()
-	r.HandleFunc("/request", server.request)
 	r.HandleFunc("/register", server.register)
+	r.HandleFunc("/request", server.request)
 	r.HandleFunc("/status", server.status)
 
 	go server.dispatchConnections()
