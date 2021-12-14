@@ -81,7 +81,10 @@ func (server *Server) Start() {
 
 	go server.dispatchConnections()
 
-	server.server = &http.Server{Addr: server.Config.Host + ":" + strconv.Itoa(server.Config.Port), Handler: r}
+	server.server = &http.Server{
+		Addr:    server.Config.GetAddr(),
+		Handler: r,
+	}
 	go func() { log.Fatal(server.server.ListenAndServe()) }()
 }
 

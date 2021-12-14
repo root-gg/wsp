@@ -2,6 +2,7 @@ package server
 
 import (
 	"io/ioutil"
+	"strconv"
 
 	"gopkg.in/yaml.v2"
 
@@ -17,6 +18,11 @@ type Config struct {
 	Whitelist   []*wsp.Rule
 	Blacklist   []*wsp.Rule
 	SecretKey   string
+}
+
+// GetAddr returns the address to specify a HTTP server address
+func (c Config) GetAddr() string {
+	return c.Host + ":" + strconv.Itoa(c.Port)
 }
 
 // NewConfig creates a new ProxyConfig
