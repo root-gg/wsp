@@ -6,8 +6,6 @@ import (
 	"os"
 	"os/signal"
 
-	"github.com/root-gg/wsp"
-
 	"github.com/root-gg/wsp/server"
 )
 
@@ -20,7 +18,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("Unable to load configuration : %s", err)
 	}
-	wsp.Dump(config)
 
 	server := server.NewServer(config)
 
