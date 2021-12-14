@@ -53,7 +53,7 @@ make build-server
 WSP server configuration
 ------------------------
 
-```
+```cfg
 # wsp_server.cfg
 ---
 host : 127.0.0.1                     # Address to bind the HTTP server
@@ -73,7 +73,7 @@ idletimeout : 60000                  # Time to wait before closing idle connecti
 # secretkey : ThisIsASecret          # secret key that must be set in clients configuration
 ```
 
-```
+```bash
 $ ./wsp_server -config wsp_server.cfg
 {
   "Host": "127.0.0.1",
@@ -99,7 +99,7 @@ like NGinx or Apache...
 WSP proxy configuration
 -----------------------
 
-```
+```cfg
 # wsp_client.cfg
 ---
 targets :                            # Endpoints to connect to
@@ -129,7 +129,7 @@ poolmaxsize : 100                    # Maximum number of concurrent open (TCP) c
 - poolMaxSize is the maximum number of simultaneous connection that
  the proxy will ever initiate per WSP server.
 
-```
+```bash
 $ ./wsp_client -config wsp_client.cfg
 {
   "ID": "7e2d8782-f893-4ff3-7e9d-299b4c0a518a",
@@ -156,8 +156,7 @@ $ ./wsp_client -config wsp_client.cfg
 Client
 ------
 
-```
+```bash
 $ curl -H 'X-PROXY-DESTINATION: https://google.fr' http://127.0.0.1:8080/request
 <!doctype html><html itemscope="" itemtype="http://schema.org/WebPage" lang="fr"><head><meta content="text/html; charset=UTF-8" http-equiv="Content-Type"><meta content="/images/branding/googleg/1x/googleg_standard_color_128dp.png" it...
 ```
-
