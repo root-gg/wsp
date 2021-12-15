@@ -5,8 +5,6 @@ import (
 	"strconv"
 
 	"gopkg.in/yaml.v2"
-
-	"github.com/root-gg/wsp"
 )
 
 // Config configures an Server
@@ -15,8 +13,6 @@ type Config struct {
 	Port        int
 	Timeout     int
 	IdleTimeout int
-	Whitelist   []*wsp.Rule
-	Blacklist   []*wsp.Rule
 	SecretKey   string
 }
 
@@ -32,8 +28,6 @@ func NewConfig() (config *Config) {
 	config.Port = 8080
 	config.Timeout = 1000
 	config.IdleTimeout = 60000
-	config.Whitelist = make([]*wsp.Rule, 0)
-	config.Blacklist = make([]*wsp.Rule, 0)
 	return
 }
 
@@ -49,20 +43,6 @@ func LoadConfiguration(path string) (config *Config, err error) {
 	err = yaml.Unmarshal(bytes, config)
 	if err != nil {
 		return
-	}
-
-	// Compile the rules
-
-	for _, rule := range config.Whitelist {
-		if err = rule.Compile(); err != nil {
-			return
-		}
-	}
-
-	for _, rule := range config.Blacklist {
-		if err = rule.Compile(); err != nil {
-			return
-		}
 	}
 
 	return

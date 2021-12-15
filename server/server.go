@@ -201,31 +201,6 @@ func (server *Server) request(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("[%s] %s", r.Method, r.URL.String())
 
-	// Apply blacklist
-	if len(server.Config.Blacklist) > 0 {
-		for _, rule := range server.Config.Blacklist {
-			if rule.Match(r) {
-				wsp.ProxyErrorf(w, "Destination is forbidden")
-				return
-			}
-		}
-	}
-
-	// Apply whitelist
-	if len(server.Config.Whitelist) > 0 {
-		allowed := false
-		for _, rule := range server.Config.Whitelist {
-			if rule.Match(r) {
-				allowed = true
-				break
-			}
-		}
-		if !allowed {
-			wsp.ProxyErrorf(w, "Destination is not allowed")
-			return
-		}
-	}
-
 	if len(server.pools) == 0 {
 		wsp.ProxyErrorf(w, "No proxy available")
 		return

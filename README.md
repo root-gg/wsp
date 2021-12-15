@@ -59,8 +59,6 @@ $ ./wsp_server -config examples/wsp_server.cfg
   "Port": 8080,
   "Timeout": 1000,
   "IdleTimeout": 60000,
-  "Whitelist": [],
-  "Blacklist": [],
   "SecretKey": ""
 }
 ```
@@ -76,8 +74,6 @@ $ ./wsp_client -config examples/wsp_client.cfg
   ],
   "PoolIdleSize": 1,
   "PoolMaxSize": 100,
-  "Whitelist": [],
-  "Blacklist": [],
   "SecretKey": ""
 }
 ```
@@ -99,16 +95,6 @@ host : 127.0.0.1                     # Address to bind the HTTP server
 port : 8080                          # Port to bind the HTTP server
 timeout : 1000                       # Time to wait before acquiring a WS connection to forward the request (milliseconds)
 idletimeout : 60000                  # Time to wait before closing idle connection when there is enough idle connections (milliseconds)
-#blacklist :                         # Forbidden destination ( deny nothing if empty )
-# - method : ".*"                    #   Applied in order before whitelist
-#   url : "^http(s)?://google.*"     #   None must match
-#   headers :                        #   Optinal header check
-#     X-CUSTOM-HEADER : "^value$"    # 
-#whitelist :                         # Allowed destinations  ( allow all if empty )
-# - method : "^GET$"                 #   Applied in order after blacklist
-#   url : "^http(s)?://.*$"          #   One must match
-#   headers :                        #   Optinal header check
-#     X-CUSTOM-HEADER : "^value$"    # 
 # secretkey : ThisIsASecret          # secret key that must be set in clients configuration
 ```
 
@@ -145,16 +131,6 @@ targets :                            # Endpoints to connect to
  - ws://127.0.0.1:8080/register      #
 poolidlesize : 10                    # Default number of concurrent open (TCP) connections to keep idle per WSP server
 poolmaxsize : 100                    # Maximum number of concurrent open (TCP) connections per WSP server
-#blacklist :                         # Forbidden destination ( deny nothing if empty )
-# - method : ".*"                    #   Applied in order before whitelist
-#   url : ".*forbidden.*"            #   None must match
-#   headers :                        #   Optinal header check
-#     X-CUSTOM-HEADER : "^value$"    # 
-#whitelist :                         # Allowed destinations  ( allow all if empty )
-# - method : "^GET$"                 #   Applied in order after blacklist
-#   url : "http(s)?://.*$"           #   One must match
-#   headers :                        #   Optinal header check
-#     X-CUSTOM-HEADER : "^value$"    # 
 # secretkey : ThisIsASecret          # secret key that must match the value set in servers configuration
 ```
 

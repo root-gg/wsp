@@ -124,47 +124,6 @@ func (connection *Connection) serve(ctx context.Context) {
 
 		log.Printf("[%s] %s", req.Method, req.URL.String())
 
-		// Apply blacklist
-		if len(connection.pool.client.Config.Blacklist) > 0 {
-			for _, rule := range connection.pool.client.Config.Blacklist {
-				if rule.Match(req) {
-					// Discard request body
-					err = connection.discard()
-					if err != nil {
-						break
-					}
-					err = connection.error("Destination is forbidden")
-					if err != nil {
-						break
-					}
-					continue
-				}
-			}
-		}
-
-		// Apply whitelist
-		if len(connection.pool.client.Config.Whitelist) > 0 {
-			allowed := false
-			for _, rule := range connection.pool.client.Config.Whitelist {
-				if rule.Match(req) {
-					allowed = true
-					break
-				}
-			}
-			if !allowed {
-				// Discard request body
-				err = connection.discard()
-				if err != nil {
-					break
-				}
-				err = connection.error("Destination is not allowed\n")
-				if err != nil {
-					break
-				}
-				continue
-			}
-		}
-
 		// Pipe request body
 		_, bodyReader, err := connection.ws.NextReader()
 		if err != nil {

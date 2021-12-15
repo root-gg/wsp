@@ -5,8 +5,6 @@ import (
 
 	uuid "github.com/nu7hatch/gouuid"
 	"gopkg.in/yaml.v2"
-
-	"github.com/root-gg/wsp"
 )
 
 // Config configures an Proxy
@@ -15,8 +13,6 @@ type Config struct {
 	Targets      []string
 	PoolIdleSize int
 	PoolMaxSize  int
-	Whitelist    []*wsp.Rule
-	Blacklist    []*wsp.Rule
 	SecretKey    string
 }
 
@@ -34,9 +30,6 @@ func NewConfig() (config *Config) {
 	config.PoolIdleSize = 10
 	config.PoolMaxSize = 100
 
-	config.Whitelist = make([]*wsp.Rule, 0)
-	config.Blacklist = make([]*wsp.Rule, 0)
-
 	return
 }
 
@@ -52,20 +45,6 @@ func LoadConfiguration(path string) (config *Config, err error) {
 	err = yaml.Unmarshal(bytes, config)
 	if err != nil {
 		return
-	}
-
-	// Compile the rules
-
-	for _, rule := range config.Whitelist {
-		if err = rule.Compile(); err != nil {
-			return
-		}
-	}
-
-	for _, rule := range config.Blacklist {
-		if err = rule.Compile(); err != nil {
-			return
-		}
 	}
 
 	return
