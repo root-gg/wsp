@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"log"
 	"os"
@@ -10,6 +11,8 @@ import (
 )
 
 func main() {
+	ctx := context.Background()
+
 	configFile := flag.String("config", "wsp_client.cfg", "config file path")
 	flag.Parse()
 
@@ -33,7 +36,7 @@ func main() {
 		}
 	}()
 
-	proxy.Start()
+	proxy.Start(ctx)
 
 	select {}
 }

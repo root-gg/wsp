@@ -1,6 +1,7 @@
 package client
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/gorilla/websocket"
@@ -27,11 +28,11 @@ func NewClient(config *Config) (c *Client) {
 }
 
 // Start the Proxy
-func (c *Client) Start() {
+func (c *Client) Start(ctx context.Context) {
 	for _, target := range c.Config.Targets {
 		pool := NewPool(c, target, c.Config.SecretKey)
 		c.pools[target] = pool
-		go pool.Start()
+		go pool.Start(ctx)
 	}
 }
 

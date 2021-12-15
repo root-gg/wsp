@@ -1,6 +1,7 @@
 package client
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -38,11 +39,15 @@ func NewConnection(pool *Pool) (conn *Connection) {
 }
 
 // Connect to the IsolatorServer using a HTTP websocket
-func (connection *Connection) Connect() (err error) {
+func (connection *Connection) Connect(ctx context.Context) (err error) {
 	log.Printf("Connecting to %s", connection.pool.target)
 
 	// Create a new TCP(/TLS) connection ( no use of net.http )
-	connection.ws, _, err = connection.pool.client.dialer.Dial(connection.pool.target, http.Header{"X-SECRET-KEY": {connection.pool.secretKey}})
+	connection.ws, _, err = connection.pool.client.dialer.DialContext(
+		ctx,
+		connection.pool.target,
+		http.Header{"X-SECRET-KEY": {connection.pool.secretKey}},
+	)
 
 	if err != nil {
 		return err
@@ -59,7 +64,7 @@ func (connection *Connection) Connect() (err error) {
 		return
 	}
 
-	go connection.serve()
+	go connection.serve(ctx)
 
 	return
 }
@@ -71,7 +76,7 @@ func (connection *Connection) Connect() (err error) {
 //
 // As in the server code there is no buffering of HTTP request/response body
 // As is the server if any error occurs the connection is closed/throwed
-func (connection *Connection) serve() {
+func (connection *Connection) serve(ctx context.Context) {
 	defer connection.Close()
 
 	// Keep connection alive
@@ -97,7 +102,7 @@ func (connection *Connection) serve() {
 		connection.status = RUNNING
 
 		// Trigger a pool refresh to open new connections if needed
-		go connection.pool.connector()
+		go connection.pool.connector(ctx)
 
 		// Deserialize request
 		httpRequest := new(wsp.HTTPRequest)

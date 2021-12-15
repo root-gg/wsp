@@ -1,6 +1,7 @@
 package client
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"sync"
@@ -31,8 +32,8 @@ func NewPool(client *Client, target string, secretKey string) (pool *Pool) {
 }
 
 // Start connect to the remote Server
-func (pool *Pool) Start() {
-	pool.connector()
+func (pool *Pool) Start(ctx context.Context) {
+	pool.connector(ctx)
 	go func() {
 		ticker := time.Tick(time.Second)
 		for {
@@ -40,20 +41,18 @@ func (pool *Pool) Start() {
 			case <-pool.done:
 				break
 			case <-ticker:
-				pool.connector()
+				pool.connector(ctx)
 			}
 		}
 	}()
 }
 
 // The garbage collector
-func (pool *Pool) connector() {
+func (pool *Pool) connector(ctx context.Context) {
 	pool.lock.Lock()
 	defer pool.lock.Unlock()
 
 	poolSize := pool.Size()
-
-	//log.Printf("%s pool size : %v", pool.target, poolSize)
 
 	// Create enough connection to fill the pool
 	toCreate := pool.client.Config.PoolIdleSize - poolSize.idle
@@ -68,15 +67,13 @@ func (pool *Pool) connector() {
 		toCreate = pool.client.Config.PoolMaxSize - poolSize.total
 	}
 
-	//log.Printf("%v",toCreate)
-
 	// Try to reach ideal pool size
 	for i := 0; i < toCreate; i++ {
 		conn := NewConnection(pool)
 		pool.connections = append(pool.connections, conn)
 
 		go func() {
-			err := conn.Connect()
+			err := conn.Connect(ctx)
 			if err != nil {
 				log.Printf("Unable to connect to %s : %s", pool.target, err)
 
